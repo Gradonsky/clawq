@@ -1,0 +1,31 @@
+{
+  "name": "clawq",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CLI gateway for the Teneo Agent Network — discover, inspect, and query AI agents with automatic x402 USDC micropayments",
+  "bin": {
+    "clawq": "./bin/clawq.mjs"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clawq": "node dist/clawq.js",
+    "test": "tsx test-clawq.ts",
+    "start": "node dist/clawq.js",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/ws": "^8.5.0",
+    "@types/node": "^22.0.0"
+  }
+}
