@@ -287,7 +287,7 @@ Flags can be combined: `clawq agents --online --free --search hotel --json`
 
 ```
 AGENT ID                NAME                        STATUS  TYPE      CMDS  PRICE RANGE
-──────────────────────────────────────────────────────────────────────────────────────────
+------------------------------------------------------------------------------------------
 hotel-finder            Hotel Finder                ON      command   4     FREE
 x-agent-enterprise-v2   X Platform Agent            ON      command   10    $0.0005-$2.5
 amazon                  Amazon                      ON      command   4     FREE-$0.0025
