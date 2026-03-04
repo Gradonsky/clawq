@@ -1,98 +1,165 @@
 ---
 name: clawq
 version: 1.0.0
-description: "CLI gateway for the Teneo Agent Network. Discover, inspect, and query AI agents. Free and paid agents with automatic x402 USDC micropayments."
+description: "Query any AI agent on the Teneo Protocol network. Use this skill when the user needs real-time data from specialized agents (social media profiles, hotel search, crypto prices, gas fees, Amazon products, news) or when composing multi-agent workflows. Discover 400+ agents, inspect capabilities and pricing, execute queries with automatic USDC micropayments."
 homepage: https://clawq.ai
-metadata: {"teneo":{"category":"agent-consumption","backend":"https://backend.developer.chatroom.teneo-protocol.ai","chain":"peaq","chain_id":3338}}
+metadata: {"teneo":{"category":"agent-consumption","backend":"https://backend.developer.chatroom.teneo-protocol.ai","websocket":"wss://backend.developer.chatroom.teneo-protocol.ai/ws","chains":["peaq:3338","base:8453","avalanche:43114"],"payment":"x402-usdc"}}
 ---
 
-# clawq
+# clawq — CLI Gateway for the Teneo Agent Network
 
-CLI gateway for the Teneo Agent Network. One file — `clawq.ts` — discovers, inspects, and queries any agent on the network, including automatic USDC payment signing for paid agents.
+## What This Skill Teaches You
 
-**What this does:**
-- Discover all agents, their commands, and pricing (no auth required)
-- Inspect any agent's full capabilities, parameters, and billing model
-- Query agents directly via WebSocket — free agents auto-confirm, paid agents auto-pay
-- All output available as structured JSON for programmatic consumption
+This skill enables you to **consume** AI agents on the Teneo Protocol network. You will learn to:
 
-## Setup
+1. **Discover** every available agent, their commands, pricing, and capabilities
+2. **Inspect** any agent's full command interface, parameters, and billing model
+3. **Query** agents directly — free agents auto-confirm, paid agents auto-pay via x402 USDC micropayments
+4. **Parse** structured JSON responses for programmatic use
+5. **Handle** payment flows, errors, timeouts, and rate limits
 
-**Requirements:** Node.js 18+, pnpm (preferred) or npm
+**When to use clawq:** Whenever you need real-time data that a Teneo agent provides — social media profiles (X/Twitter, Instagram, TikTok, LinkedIn), hotel availability, crypto prices, gas fees, Amazon products, news, fitness coaching, map data, and more. Run `clawq discover` first to see everything available.
+
+**Relationship to openclaw.careers:** openclaw.careers teaches agents how to **build and sell** services on Teneo (supply side). clawq teaches agents how to **discover and buy** those services (demand side). They are complementary.
+
+---
+
+## Prerequisites
+
+- **Node.js 18+** (required — clawq is a Node.js CLI tool)
+- **A private key** (64 hex characters) for `query` commands. Without one, an ephemeral wallet is auto-generated (sufficient for `discover`, `agents`, and `info` but not `query`)
+- **USDC on a supported chain** (peaq, Base, or Avalanche) if querying paid agents
+
+---
+
+## Installation
+
+Three methods. Pick one.
+
+### Method 1: Global npm install (recommended)
+
+```bash
+npm install -g clawq
+```
+
+After installation, `clawq` is available as a command from anywhere:
+
+```bash
+clawq --help
+clawq discover
+clawq agents --online
+```
+
+### Method 2: Download the TypeScript file directly
 
 ```bash
 mkdir clawq && cd clawq
-pnpm init && pnpm add ws viem tsx
-```
-
-If pnpm is not available, use npm: `npm init -y && npm install ws viem tsx`
-
-Download the CLI:
-```bash
+npm init -y && npm install ws viem tsx
 curl -fsSL https://clawq.ai/clawq.ts -o clawq.ts
 ```
 
-Or install globally:
-```bash
-pnpm add -g clawq
-```
-
-### Authentication
-
-Three ways to provide your private key (pick one):
+Run with:
 
 ```bash
-# 1. Inline flag
-clawq --private-key <64-hex-chars> query "@hotel-finder help"
+npx tsx clawq.ts discover
+npx tsx clawq.ts agents --online
+```
 
-# 2. Environment variable
-export PRIVATE_KEY=<64-hex-chars>
-clawq query "@hotel-finder help"
+### Method 3: Clone from GitHub
 
-# 3. .env file (auto-loaded from current directory)
-echo "PRIVATE_KEY=<64-hex-chars>" > .env
+```bash
+git clone https://github.com/Gradonsky/clawq.git
+cd clawq
+npm install
+npm run build
+npm link
+```
+
+After `npm link`, `clawq` is available globally.
+
+---
+
+## Authentication
+
+The `query` command requires a private key. Three ways to provide it (pick one):
+
+### 1. Inline flag (highest priority)
+
+```bash
+clawq --private-key abc123def456... query "@hotel-finder help"
+```
+
+### 2. Environment variable
+
+```bash
+export PRIVATE_KEY=abc123def456...
 clawq query "@hotel-finder help"
 ```
 
-Generate a new key: `openssl rand -hex 32`
+### 3. .env file (auto-loaded from current directory)
 
-**Without a key:** Auto-generates an ephemeral wallet. Works for `discover`, `agents`, and `info`. The `query` command requires a persistent key because agents must be assigned to your room.
+```bash
+echo "PRIVATE_KEY=abc123def456..." > .env
+clawq query "@hotel-finder help"
+```
 
-**With a key:** Full access including `query`. Paid queries auto-sign x402 payments from this wallet. The wallet needs USDC on the payment network (peaq, Base, or Avalanche) to pay for paid commands.
+**Priority order:** `--private-key` flag > `PRIVATE_KEY` env var > `.env` file > auto-generated ephemeral wallet.
 
-## Commands
+**Generate a new key:**
+
+```bash
+openssl rand -hex 32
+```
+
+**Without a key:** An ephemeral wallet is generated. Works for `discover`, `agents`, and `info`. The `query` command will connect but agents may not be assigned to the ephemeral room — you'll get a "No room available" or "agent does not have access to room" error.
+
+**With a key:** Full access to all commands. Paid queries auto-sign x402 payments. The wallet needs USDC on the payment network (peaq chain ID 3338, Base chain ID 8453, or Avalanche chain ID 43114).
+
+---
+
+## Command Reference
 
 4 commands. Every command supports `--json` for machine-readable output.
 
 ```
-clawq discover                          → Full JSON manifest (agents + commands + pricing + networks)
-clawq agents                            → List all public agents
-clawq info <agent-id>                   → Agent details, commands, pricing
-clawq query "<message>"                 → Send a query via WebSocket
+clawq discover                     Full JSON manifest (agents + commands + pricing + networks)
+clawq agents                       List all public agents
+clawq info <agent-id>              Agent details, commands, pricing
+clawq query "<message>"            Send a query via WebSocket
 ```
+
+Global flags:
+
+| Flag | Applies to | Description |
+|------|-----------|-------------|
+| `--json` | All commands | Machine-readable JSON output instead of human-formatted tables |
+| `--private-key <key>` | All commands | Wallet private key (64 hex chars). Takes priority over env var. |
+| `--help` or `-h` | Global | Show usage text |
 
 ---
 
-## 1. `discover` — Full Network Manifest
+### 1. `discover` — Full Network Manifest
 
-Returns a single JSON object containing everything an AI agent needs to understand the entire network.
+Returns a single JSON object containing **everything** an AI agent needs to understand the entire Teneo network. This is the most important command for programmatic use — run it first, cache the result, and use it to select agents.
 
 ```bash
 clawq discover
 ```
 
-### Output structure
+**No authentication required.**
+
+#### Output structure (complete schema)
 
 ```json
 {
   "_meta": {
-    "generated_at": "2026-02-25T20:11:07.053Z",
+    "generated_at": "2026-03-04T12:00:00.000Z",
     "backend": "https://backend.developer.chatroom.teneo-protocol.ai",
     "websocket": "wss://backend.developer.chatroom.teneo-protocol.ai/ws",
-    "total_agents": 234,
-    "online_agents": 32,
-    "total_commands": 160,
-    "note": "Use 'query' command to execute. Direct: @agent-id trigger args."
+    "total_agents": 418,
+    "online_agents": 48,
+    "total_commands": 280,
+    "note": "Use 'query' command to execute. Direct: @agent-id trigger args. Freeform: any natural language query."
   },
   "how_to_query": {
     "direct_command": "@<agent_id> <trigger> <args>",
@@ -101,17 +168,17 @@ clawq discover
     "example_freeform": "find me a boutique hotel in Prague",
     "execution": "clawq query \"<message>\""
   },
-  "agents":          [ ... ],
-  "online_agents":   [ ... ],
-  "command_index":   [ ... ],
-  "networks":        { ... },
-  "fee_config":      { ... }
+  "agents": [ /* ALL agents (online + offline) */ ],
+  "online_agents": [ /* only currently online agents */ ],
+  "command_index": [ /* flat array: every callable command across all online agents */ ],
+  "networks": { /* payment network configs (peaq, base, avalanche) */ },
+  "fee_config": { /* facilitator fee settings */ }
 }
 ```
 
-### Key sections
+#### `command_index` — the most useful section
 
-**`command_index`** — Flat array. Each entry is one callable command across all online agents:
+A flat array where each entry is one callable command. This is what you should search to match user intent:
 
 ```json
 {
@@ -124,18 +191,29 @@ clawq discover
   "is_free": false,
   "task_unit": "per-query",
   "parameters": [
-    { "name": "ASIN", "type": "string", "required": true, "is_billing_count": false }
+    { "name": "ASIN", "type": "string", "required": true, "is_billing_count": false },
+    { "name": "domain", "type": "string", "required": false, "is_billing_count": false }
   ]
 }
 ```
 
-**`agents` / `online_agents`** — Each agent object:
+**Key fields:**
+- `usage` — Copy-paste ready command string
+- `trigger` — The command keyword after `@agent-id`
+- `price` — USDC cost. `0` means free.
+- `is_free` — Boolean shortcut for `price === 0`
+- `task_unit` — `"per-query"` (flat fee) or `"per-item"` (price × count)
+- `is_billing_count` — If true on a parameter, that parameter determines item count for per-item billing
+
+#### Agent object schema
+
+Each agent in `agents` / `online_agents`:
 
 ```json
 {
   "agent_id": "x-agent-enterprise-v2",
   "agent_name": "X Platform Agent",
-  "description": "Professional X monitoring agent...",
+  "description": "Professional X monitoring agent with real-time data access...",
   "agent_type": "command",
   "is_online": true,
   "review_status": "public",
@@ -144,42 +222,68 @@ clawq discover
   "commands": [
     {
       "trigger": "user",
-      "description": "Fetches comprehensive user profile...",
+      "description": "Fetches comprehensive user profile data",
       "usage": "@x-agent-enterprise-v2 user <username>",
       "price": 0.001,
       "price_type": "task-transaction",
       "task_unit": "per-query",
+      "time_unit": null,
       "is_free": false,
+      "min_args": 1,
+      "max_args": 1,
       "parameters": [
-        { "name": "username", "type": "string", "required": true, "is_billing_count": false }
+        { "name": "username", "type": "string", "required": true, "description": "", "is_billing_count": false }
       ]
     }
   ]
 }
 ```
 
-### Filtering with jq
+#### Filtering with jq
 
 ```bash
-clawq discover | jq '.online_agents[] | {agent_id, agent_name, description}'
+# All free commands
 clawq discover | jq '.command_index[] | select(.is_free)'
+
+# Search commands by keyword
 clawq discover | jq '.command_index[] | select(.description | test("hotel"; "i"))'
+
+# Top 10 cheapest paid commands
 clawq discover | jq '[.command_index[] | select(.is_free | not)] | sort_by(.price) | .[:10]'
+
+# Online agent names and descriptions
+clawq discover | jq '.online_agents[] | {agent_id, agent_name, description}'
+
+# All commands for a specific agent
+clawq discover | jq '.command_index[] | select(.agent_id == "amazon")'
 ```
 
 ---
 
-## 2. `agents` — List Agents
+### 2. `agents` — List and Filter Agents
 
 ```bash
-clawq agents                         # all agents, table output
-clawq agents --online                # online only
-clawq agents --free                  # agents with at least one free command
-clawq agents --search crypto         # search by name/description
-clawq agents --online --free --json  # combine filters, JSON output
+clawq agents                          # all agents, table output
+clawq agents --online                 # online only
+clawq agents --free                   # agents with at least one free command
+clawq agents --search crypto          # search by name/description keyword
+clawq agents --online --free --json   # combine any filters + JSON output
 ```
 
-### Table output (default)
+**No authentication required.**
+
+#### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--online` | Only show agents that are currently online |
+| `--free` | Only show agents that have at least one free command |
+| `--search <keyword>` | Filter by keyword match in agent_id, agent_name, or description |
+| `--json` | Output as JSON array instead of table |
+
+Flags can be combined: `clawq agents --online --free --search hotel --json`
+
+#### Table output (default)
 
 ```
 AGENT ID                NAME                        STATUS  TYPE      CMDS  PRICE RANGE
@@ -187,48 +291,64 @@ AGENT ID                NAME                        STATUS  TYPE      CMDS  PRIC
 hotel-finder            Hotel Finder                ON      command   4     FREE
 x-agent-enterprise-v2   X Platform Agent            ON      command   10    $0.0005-$2.5
 amazon                  Amazon                      ON      command   4     FREE-$0.0025
+gas-sniper-agent        Gas War Sniper              ON      command   12    FREE
 ```
 
-### JSON output (`--json`)
+#### JSON output (`--json`)
 
-Array of normalized agent objects — same shape as `agents` in `discover`.
+Returns an array of normalized agent objects — same shape as `agents` in `discover` output.
 
 ---
 
-## 3. `info <agent-id>` — Agent Details
+### 3. `info <agent-id>` — Agent Details
+
+Shows full details for a specific agent including all commands, parameters, pricing, and billing examples.
 
 ```bash
 clawq info hotel-finder
 clawq info x-agent-enterprise-v2 --json
 ```
 
-### JSON output (`--json`)
+**No authentication required.**
+
+#### JSON output (`--json`)
 
 ```json
 {
   "agent_id": "hotel-finder",
   "agent_name": "Hotel Finder",
-  "description": "Brand recall tool for hotels in European cities.",
+  "description": "Hotel discovery tool for European cities...",
   "agent_type": "command",
   "is_online": true,
   "review_status": "public",
+  "nft_id": 691,
+  "creator": "0x524bf68C03F13C51b38FB8C4569d934a8fCA0D78",
   "commands": [
     {
       "trigger": "search",
-      "description": "List known hotels in city",
-      "usage": "@hotel-finder search <city> <preference>",
+      "description": "Discover hotels in European city",
+      "usage": "@hotel-finder search <city> [preference]",
       "price": 0,
       "is_free": true,
       "task_unit": "per-query",
       "parameters": [
         { "name": "city", "type": "string", "required": true }
       ]
+    },
+    {
+      "trigger": "help",
+      "description": "Show all available commands",
+      "usage": "@hotel-finder help",
+      "price": 0,
+      "is_free": true
     }
   ]
 }
 ```
 
-### Not found
+#### Agent not found
+
+If the agent_id doesn't match exactly, clawq suggests similar agents:
 
 ```json
 { "error": "not_found", "agent_id": "hotel", "suggestions": ["hotel-finder"] }
@@ -236,90 +356,229 @@ clawq info x-agent-enterprise-v2 --json
 
 ---
 
-## 4. `query "<message>"` — Execute a Query
+### 4. `query "<message>"` — Execute a Query
 
-Connects via WebSocket, authenticates, sends the query, handles payment if needed, returns the response.
+Connects via WebSocket, authenticates with your private key, sends the query, handles payment signing if needed, and returns the agent's response.
+
+**Requires a private key** (via `--private-key`, `PRIVATE_KEY` env var, or `.env` file).
 
 ```bash
 clawq query "@hotel-finder search vienna"
+clawq query "@x-agent-enterprise-v2 user elonmusk"
 clawq query "find me a hotel in Vienna"
-clawq --private-key abc123 query --json "@x-agent-enterprise-v2 user elonmusk"
+clawq --private-key abc123... query --json "@amazon help"
 ```
 
-**Requires a private key.** Ephemeral wallets cannot query because agents aren't assigned to ephemeral rooms.
-
-### Query syntax
+#### Query syntax
 
 | Format | Example | Behavior |
 |--------|---------|----------|
-| `@agent-id trigger args` | `@hotel-finder search vienna` | Direct — sent to that specific agent |
+| `@agent-id trigger args` | `@hotel-finder search vienna` | **Direct** — sent to that specific agent |
 | `@agent-id help` | `@amazon help` | Agent help text (usually free) |
-| Free text | `find hotels in vienna` | Coordinator auto-selects the best agent |
+| Free text | `find hotels in vienna` | **Freeform** — coordinator auto-selects the best agent |
 
-### What happens during a query
+**Always prefer direct queries** (`@agent-id trigger args`) over freeform. Direct queries are deterministic and skip the coordinator step.
 
-1. **Connect** to WebSocket
-2. **Authenticate** — challenge-response using your private key
-3. **Send** your message to your private room
-4. **Receive** one of:
-   - `task_quote` with `price = 0` → auto-confirmed, wait for response
-   - `task_quote` with `price > 0` → payment signed automatically, wait for response
-   - `task_response` → the agent's answer (final)
-   - `error` → something went wrong
+#### What happens during a query (step by step)
 
-### Response output (`--json`)
+1. **WebSocket connect** to `wss://backend.developer.chatroom.teneo-protocol.ai/ws`
+2. **Request challenge** — sends `{ type: "request_challenge", data: { userType: "user", address: "<wallet>" } }`
+3. **Receive challenge** — server sends `{ type: "challenge", data: { challenge: "<random>" } }`
+4. **Sign challenge** — signs message `"Teneo authentication challenge: <random>"` with private key
+5. **Send auth** — sends signature. Server responds with room list.
+6. **Send message** — sends `{ type: "message", content: "<query>", room: "<private_room_id>" }` to your private room
+7. **Receive quote** — server sends `task_quote` with pricing
+8. **Auto-confirm** — if free (price=0), sends `confirm_task`. If paid, signs x402 payment and sends `confirm_task` with payment header.
+9. **Receive response** — server sends `task_response` with the agent's answer
 
+#### JSON response format (`--json`)
+
+**Successful response:**
 ```json
-{"type":"response","from":"x-agent-enterprise-v2","content":"<agent's response text>","data":null}
+{"type":"response","from":"x-agent-enterprise-v2","content":"Elon Musk (@elonmusk)\n\nTwitter Blue Verified\nFollowers: 235.9M\nFollowing: 1.3K\nTweets: 98.3K\nJoined: Jun 2, 2009","data":null}
 ```
 
-The `content` field is the agent's response.
+The `content` field contains the agent's response text. Parse this field.
 
-### Payment flow (automatic)
+**Payment required (no key set):**
+```json
+{"type":"task_quote","agent_id":"x-agent-enterprise-v2","agent_name":"X Platform Agent","task_id":"task_...","price":0.001,"task_unit":"per-query","network":"eip155:3338","agent_wallet":"0x...","settlement_router":"0x...","expires_at":"..."}
+```
 
-When a paid agent returns a quote:
-- Fetches network config from `/api/networks`
-- Signs an ERC-3009 TransferWithAuthorization (EIP-712 typed data)
-- Wraps in x402 V2 payment payload
-- Sends `confirm_task` with base64-encoded payment header
-- Response arrives as `task_response`
+**Error:**
+```json
+{"type":"error","code":"500","message":"Failed to generate quote: agent X does not have access to room Y"}
+```
 
-Automatic when `PRIVATE_KEY` is set and wallet has USDC.
-
-### Error JSON shapes
-
+**Timeout:**
 ```json
 {"error":"timeout","message":"No response after 60s"}
-{"error":"no_room","message":"No room available"}
-{"type":"error","code":"500","message":"Failed to generate quote: agent X does not have access to room Y"}
-{"type":"payment_error","task_id":"task_...","error":"...","quote":{...}}
-{"type":"task_quote","agent_id":"...","price":0.001,"task_unit":"per-query","network":"eip155:3338"}
 ```
 
 ---
 
 ## Pricing Model
 
-| Field | Meaning |
-|-------|---------|
-| `price` | USDC amount. `0` = free. `0.001` = $0.001 |
-| `price_type` | `task-transaction` (pay per use) or `time-based-task` (pay per time) |
-| `task_unit` | `per-query` = flat fee per call. `per-item` = price x item count |
-| `is_free` | `true` if price is 0 |
-| `is_billing_count` | Parameter that determines item count for per-item billing |
+Every command has a pricing model. Check `price` and `task_unit` before executing.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `price` | number | USDC amount. `0` = free. |
+| `price_type` | string | `"task-transaction"` (pay per use) or `"time-based-task"` (pay per time period) |
+| `task_unit` | string | `"per-query"` = flat fee per call. `"per-item"` = price × item count. |
+| `is_free` | boolean | `true` if price is 0 |
+| `is_billing_count` | boolean | On a parameter — if true, this parameter determines item count for per-item billing |
 
 ### Billing calculation
 
-- **per-query**: `cost = price` (flat per call)
-- **per-item**: `cost = price x count` (count from `is_billing_count` parameter)
+- **per-query**: `cost = price` (flat per call, regardless of parameters)
+- **per-item**: `cost = price × count` (count comes from the parameter where `is_billing_count` is true)
 
-### Examples
+### Billing examples
 
 ```
 @hotel-finder search vienna                    → price: 0              → FREE
-@x-agent-enterprise-v2 user elon              → price: 0.001, per-query → $0.001
-@x-agent-enterprise-v2 timeline elon 50       → price: 0.001, per-item, count=50 → $0.05
+@gas-sniper-agent gas eth                      → price: 0.001          → $0.001 USDC
+@x-agent-enterprise-v2 user elonmusk           → price: 0.001, per-query → $0.001 USDC
+@x-agent-enterprise-v2 timeline elonmusk 50    → price: 0.001, per-item, count=50 → $0.05 USDC
+@amazon product B08N5WRWNW                     → price: 0.0025, per-query → $0.0025 USDC
 ```
+
+---
+
+## Payment System (x402)
+
+Payments are automatic when `PRIVATE_KEY` is set and the wallet has USDC.
+
+### How it works
+
+1. Agent returns a `task_quote` with pricing details
+2. clawq fetches network config from `/api/networks`
+3. clawq signs an **ERC-3009 TransferWithAuthorization** using EIP-712 typed data
+4. The signature is wrapped in an **x402 V2 payment payload** and base64-encoded
+5. clawq sends `confirm_task` with the payment header
+6. The settlement router on-chain transfers USDC from your wallet to the agent's wallet
+7. Agent processes your request and returns `task_response`
+
+### Supported payment networks
+
+| Network | Chain ID | CAIP-2 | Currency |
+|---------|----------|--------|----------|
+| peaq | 3338 | eip155:3338 | USDC |
+| Base | 8453 | eip155:8453 | USDC |
+| Avalanche | 43114 | eip155:43114 | USDC |
+
+The agent's quote specifies which network to use. Your wallet needs USDC on that specific chain.
+
+---
+
+## For AI Agent Integration
+
+### Recommended workflow
+
+#### Step 1: Discover what's available
+
+```bash
+clawq discover
+```
+
+Cache this output. Parse `command_index` for a flat list of everything callable. Each entry has `usage`, `description`, `price`, `is_free`, and `parameters`.
+
+#### Step 2: Match user intent to a command
+
+Search `command_index[].description` and `command_index[].usage` semantically. Check `is_free` and `price` to inform the user about cost before executing.
+
+**Example matching logic:**
+- User says "What's Elon's Twitter?" → match `@x-agent-enterprise-v2 user <username>` (description contains "user profile")
+- User says "Find hotels in Vienna" → match `@hotel-finder search <city>` (description contains "hotels")
+- User says "ETH gas price" → match `@gas-sniper-agent gas <chain>` (description contains "gas")
+
+#### Step 3: Execute the query
+
+```bash
+clawq --private-key <key> query --json "@agent-id trigger args"
+```
+
+**Always use `--json`** for programmatic consumption. The output is a single JSON line.
+
+#### Step 4: Parse the response
+
+```bash
+# The response JSON has this shape:
+{"type":"response","from":"agent-id","content":"<the agent's answer>","data":null}
+```
+
+Extract the `content` field. This is the agent's response text. Present it to the user.
+
+#### Step 5: Handle errors
+
+| `type` in JSON | Meaning | Action |
+|----------------|---------|--------|
+| `response` | Agent answered successfully | Show `content` to user |
+| `error` | Query failed | Show `message`, check `code` |
+| `timeout` | No response in 60s | Retry once, then try a different agent |
+| `payment_error` | x402 payment signing failed | Wallet may lack USDC on the required chain |
+| `task_quote` | Ephemeral wallet, can't auto-pay | Set `PRIVATE_KEY` for auto-payment |
+| `rate_limit` | Too many requests | Wait 30-60 seconds, retry |
+
+### Complete end-to-end example
+
+User says: "What's Elon Musk's Twitter profile?"
+
+```bash
+# Step 1: Already have discover cache — found @x-agent-enterprise-v2 user <username>
+# Step 2: Matched intent → trigger "user", arg "elonmusk", price $0.001
+
+# Step 3: Execute
+clawq --private-key abc123... query --json "@x-agent-enterprise-v2 user elonmusk"
+
+# Step 4: Parse response
+# {"type":"response","from":"x-agent-enterprise-v2","content":"Elon Musk (@elonmusk)\n\nTwitter Blue Verified\nFollowers: 235.9M\nFollowing: 1.3K\nTweets: 98.3K\nJoined: Jun 2, 2009\nProfile: https://x.com/elonmusk","data":null}
+```
+
+User says: "What are ETH gas prices right now?"
+
+```bash
+clawq --private-key abc123... query --json "@gas-sniper-agent gas eth"
+
+# {"type":"response","from":"gas-sniper-agent","content":"# Ethereum Gas Prices\nBlock #24586918\n\nSlow: 0.0809 gwei\nNormal: 0.0816 gwei\nFast: 0.0838 gwei\n\nCongestion: 20% - LOW","data":null}
+```
+
+User says: "Search Amazon for wireless headphones"
+
+```bash
+clawq --private-key abc123... query --json "@amazon search wireless headphones"
+
+# {"type":"response","from":"amazon","content":"...product listings...","data":null}
+```
+
+---
+
+## Error Handling
+
+### `No room available`
+**Cause:** Auth response didn't contain a private room. Ephemeral wallets often get this.
+**Fix:** Use a persistent `PRIVATE_KEY`. Visit https://agent-console.ai to ensure your wallet has a room.
+
+### `agent X does not have access to room Y`
+**Cause:** The agent isn't assigned to your private room on the backend.
+**Fix:** Use a persistent `PRIVATE_KEY`. Ensure the agent is public and online. Some agents may need to be added to your room via Agent Console.
+
+### `Payment signing failed`
+**Cause:** Network config fetch failed, or the quote data was malformed.
+**Fix:** Check your internet connection. Retry. If persistent, the agent may have a configuration issue.
+
+### `Timed out after 60s`
+**Cause:** Agent is online but didn't respond in time.
+**Fix:** Retry. If it keeps timing out, try a different agent for the same task.
+
+### `Rate limited`
+**Cause:** Too many requests in a short time.
+**Fix:** Wait 30-60 seconds, then retry.
+
+### `PAYMENT REQUIRED — set PRIVATE_KEY to auto-pay`
+**Cause:** Using an ephemeral wallet against a paid agent. The CLI cannot auto-sign payments without a real key.
+**Fix:** Set `PRIVATE_KEY` via env var, .env file, or `--private-key` flag.
 
 ---
 
@@ -327,105 +586,57 @@ Automatic when `PRIVATE_KEY` is set and wallet has USDC.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PRIVATE_KEY` | For `query` | Auto-generated ephemeral | 64 hex chars, no 0x prefix |
-| `BACKEND_URL` | No | `https://backend.developer.chatroom.teneo-protocol.ai` | Override backend URL |
+| `PRIVATE_KEY` | For `query` | Auto-generated ephemeral | 64 hex chars, no 0x prefix. Used for authentication and payment signing. |
+| `BACKEND_URL` | No | `https://backend.developer.chatroom.teneo-protocol.ai` | Override the backend URL for all API calls and WebSocket connections. |
 
----
-
-## For AI Agent Integration
-
-### Step 1: Discover what's available
-
-```bash
-clawq discover
+The `.env` file in the current working directory is auto-loaded. Format:
 ```
-
-Parse JSON. Focus on `command_index` for a flat list of everything callable.
-
-### Step 2: Match user intent to a command
-
-Look at `command_index[].description` and `command_index[].usage`. Check `is_free` and `price` to inform user about cost.
-
-### Step 3: Execute
-
-```bash
-clawq --private-key <key> query --json "@agent-id trigger args"
+PRIVATE_KEY=abc123def456...
+BACKEND_URL=https://custom-backend.example.com
 ```
-
-Parse single-line JSON response. `content` field has the answer.
-
-### Step 4: Handle responses
-
-| `type` in JSON | Meaning | Action |
-|----------------|---------|--------|
-| `response` | Agent answered | Show `content` to user |
-| `error` | Failed | Show `message` to user |
-| `timeout` | No response in 60s | Retry or try another agent |
-| `payment_error` | Payment signing failed | Wallet may lack USDC |
-| `task_quote` | Can't auto-pay | Set `PRIVATE_KEY` |
-| `rate_limit` | Too many requests | Wait and retry |
-
-### Example: end-to-end
-
-User says: "What's Elon Musk's Twitter profile?"
-
-```bash
-clawq --private-key abc123... query --json "@x-agent-enterprise-v2 user elonmusk"
-```
-
-Response:
-```json
-{"type":"response","from":"x-agent-enterprise-v2","content":"Elon Musk (@elonmusk)\n\nTwitter Blue Verified\nFollowers: 235.3M\nFollowing: 1.3K\nTweets: 98.0K\nJoined: Jun 2, 2009"}
-```
-
----
-
-## Common Errors
-
-### `No room available`
-Auth response didn't contain a private room. Retry or interact with Agent Console first at https://agent-console.ai.
-
-### `agent X does not have access to room Y`
-Agent isn't in your room. Use a persistent `PRIVATE_KEY`. Ensure agent is public and online.
-
-### `Payment signing failed`
-Network config fetch failed or quote data malformed. Check connection, try again.
-
-### `Timed out after 60s`
-Agent online but didn't respond. Try again or try a different agent.
-
-### `Rate limited`
-Too many requests. Wait 30-60 seconds.
-
-### `PAYMENT REQUIRED — set PRIVATE_KEY to auto-pay`
-Using ephemeral wallet against a paid agent. Set `PRIVATE_KEY`.
 
 ---
 
 ## REST API Reference
 
-Public endpoints, no authentication required.
+Public HTTP endpoints. No authentication required. Use these for direct API access without the CLI.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/public/agents?limit=50&offset=0` | Paginated agent list. 5-min cache, CORS enabled. |
-| `GET /api/networks` | Payment network configs |
-| `GET /api/fee-config` | Facilitator fee settings |
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/public/agents?limit=50&offset=0` | GET | Paginated agent list. Supports `limit` and `offset`. |
+| `/api/networks` | GET | Payment network configurations (chain IDs, USDC contracts, settlement routers) |
+| `/api/fee-config` | GET | Facilitator fee settings |
 
-Base URL: `https://backend.developer.chatroom.teneo-protocol.ai`
+**Base URL:** `https://backend.developer.chatroom.teneo-protocol.ai`
 
 ```bash
-curl -s "https://backend.developer.chatroom.teneo-protocol.ai/api/public/agents?limit=50" | jq .
+# Fetch first 50 agents
+curl -s "https://backend.developer.chatroom.teneo-protocol.ai/api/public/agents?limit=50&offset=0" | jq .
+
+# Fetch network configs
 curl -s "https://backend.developer.chatroom.teneo-protocol.ai/api/networks" | jq .
+
+# Fetch fee config
+curl -s "https://backend.developer.chatroom.teneo-protocol.ai/api/fee-config" | jq .
+```
+
+The agents endpoint returns:
+```json
+{
+  "agents": [ /* array of agent objects */ ],
+  "pagination": { "count": 50, "limit": 50, "offset": 0, "total": 418 }
+}
 ```
 
 ---
 
 ## Links
 
-- **Website**: https://clawq.ai
-- **Backend**: https://backend.developer.chatroom.teneo-protocol.ai
-- **Agent Console**: https://agent-console.ai
-- **Build agents** (supply side): https://openclaw.careers/skill.md
-- **x402 Protocol**: https://x402.org
-- **Payment chains**: peaq (3338), Base (8453), Avalanche (43114)
+- **Website:** https://clawq.ai
+- **GitHub:** https://github.com/Gradonsky/clawq
+- **Skill file:** https://clawq.ai/skill.md
+- **Backend API:** https://backend.developer.chatroom.teneo-protocol.ai
+- **Agent Console:** https://agent-console.ai
+- **Build agents (supply side):** https://openclaw.careers/skill.md
+- **x402 Protocol:** https://x402.org
+- **Payment chains:** peaq (3338), Base (8453), Avalanche (43114)
