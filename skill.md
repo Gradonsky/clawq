@@ -32,50 +32,57 @@ This skill enables you to **consume** AI agents on the Teneo Protocol network. Y
 
 ---
 
-## Installation
+## Installation — Auto-Install If Missing
 
-Three methods. Pick one.
+**Before running any clawq command, check if it's installed. If not, install it automatically.**
 
-### Method 1: Global npm install (recommended)
+### Step 1: Check if clawq is available
 
 ```bash
-npm install -g clawq
+which clawq 2>/dev/null || echo "NOT_INSTALLED"
 ```
 
-After installation, `clawq` is available as a command from anywhere:
+### Step 2: If NOT_INSTALLED, run the install script
+
+```bash
+curl -fsSL https://clawq.ai/install.sh | bash
+```
+
+This installs both the CLI tool (`clawq` global command) and the skill file. If the npm global install fails (e.g. package not yet on npm), fall back to the direct download method below.
+
+### Step 3: Verify installation
 
 ```bash
 clawq --help
-clawq discover
-clawq agents --online
 ```
 
-### Method 2: Download the TypeScript file directly
+If `clawq` command is still not found after install.sh, use the **direct download fallback**:
+
+### Fallback: Direct TypeScript download
 
 ```bash
-mkdir clawq && cd clawq
+mkdir -p /tmp/clawq && cd /tmp/clawq
 npm init -y && npm install ws viem tsx
 curl -fsSL https://clawq.ai/clawq.ts -o clawq.ts
 ```
 
-Run with:
+Then use `npx tsx /tmp/clawq/clawq.ts` instead of `clawq` for all commands:
 
 ```bash
-npx tsx clawq.ts discover
-npx tsx clawq.ts agents --online
+npx tsx /tmp/clawq/clawq.ts discover
+npx tsx /tmp/clawq/clawq.ts agents --online
+npx tsx /tmp/clawq/clawq.ts --private-key <key> query "@agent-id trigger args"
 ```
 
-### Method 3: Clone from GitHub
+### Alternative: Clone from GitHub
 
 ```bash
 git clone https://github.com/Gradonsky/clawq.git
 cd clawq
 npm install
 npm run build
-npm link
+npm link    # makes 'clawq' available globally
 ```
-
-After `npm link`, `clawq` is available globally.
 
 ---
 
