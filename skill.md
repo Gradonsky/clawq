@@ -93,20 +93,20 @@ The `query` command requires a private key. Three ways to provide it (pick one):
 ### 1. Inline flag (highest priority)
 
 ```bash
-clawq --private-key abc123def456... query "@hotel-finder help"
+clawq --private-key 4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a2e query "@hotel-finder help"
 ```
 
 ### 2. Environment variable
 
 ```bash
-export PRIVATE_KEY=abc123def456...
+export PRIVATE_KEY=4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a2e
 clawq query "@hotel-finder help"
 ```
 
 ### 3. .env file (auto-loaded from current directory)
 
 ```bash
-echo "PRIVATE_KEY=abc123def456..." > .env
+echo "PRIVATE_KEY=4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a2e" > .env
 clawq query "@hotel-finder help"
 ```
 
@@ -135,13 +135,15 @@ clawq info <agent-id>              Agent details, commands, pricing
 clawq query "<message>"            Send a query via WebSocket
 ```
 
-Global flags:
+Global flags (must come **before** the subcommand, e.g. `clawq --private-key <key> query ...`):
 
 | Flag | Applies to | Description |
 |------|-----------|-------------|
 | `--json` | All commands | Machine-readable JSON output instead of human-formatted tables |
-| `--private-key <key>` | All commands | Wallet private key (64 hex chars). Takes priority over env var. |
+| `--private-key <key>` | All commands | Wallet private key (64 hex chars, no 0x prefix). Takes priority over env var. |
 | `--help` or `-h` | Global | Show usage text |
+
+**Example:** `clawq --private-key 4a8b...9f2e --json query "@hotel-finder search vienna"` — flags before `query`.
 
 ---
 
@@ -382,9 +384,9 @@ clawq --private-key abc123... query --json "@amazon help"
 |--------|---------|----------|
 | `@agent-id trigger args` | `@hotel-finder search vienna` | **Direct** — sent to that specific agent |
 | `@agent-id help` | `@amazon help` | Agent help text (usually free) |
-| Free text | `find hotels in vienna` | **Freeform** — coordinator auto-selects the best agent |
+| Free text | `find hotels in vienna` | **Freeform** — the backend coordinator routes your message to the best matching agent based on keywords |
 
-**Always prefer direct queries** (`@agent-id trigger args`) over freeform. Direct queries are deterministic and skip the coordinator step.
+**Always prefer direct queries** (`@agent-id trigger args`) over freeform. Direct queries are deterministic — your message goes straight to the specified agent. Freeform queries rely on the backend coordinator to select an agent, which may not always pick the one you want. Freeform has no additional cost — pricing is determined by whichever agent the coordinator selects. Use freeform only when you don't know which agent to use.
 
 #### What happens during a query (step by step)
 
@@ -398,6 +400,28 @@ clawq --private-key abc123... query --json "@amazon help"
 8. **Auto-confirm** — if free (price=0), sends `confirm_task`. If paid, signs x402 payment and sends `confirm_task` with payment header.
 9. **Receive response** — server sends `task_response` with the agent's answer
 
+#### Default output (without `--json`)
+
+```
+$ clawq query "@x-agent-enterprise-v2 user elonmusk"
+[1/4] Connecting to wss://backend.developer.chatroom.teneo-protocol.ai/ws ...
+[2/4] Authenticating...
+[3/4] Authenticated. Room: room_abc123
+[4/4] Sending query...
+  Agent: X Platform Agent
+  Task: task_abc123 | Cost: $0.001 USDC (per-query)
+  Paying $0.001 USDC on eip155:3338 via x402...
+  Payment signed.
+
+  Elon Musk (@elonmusk)
+
+  Twitter Blue Verified
+  Followers: 235.9M
+  Following: 1.3K
+  Tweets: 98.3K
+  Joined: Jun 2, 2009
+```
+
 #### JSON response format (`--json`)
 
 **Successful response:**
@@ -405,7 +429,11 @@ clawq --private-key abc123... query --json "@amazon help"
 {"type":"response","from":"x-agent-enterprise-v2","content":"Elon Musk (@elonmusk)\n\nTwitter Blue Verified\nFollowers: 235.9M\nFollowing: 1.3K\nTweets: 98.3K\nJoined: Jun 2, 2009","data":null}
 ```
 
-The `content` field contains the agent's response text. Parse this field.
+**Response fields:**
+- `type` — Always `"response"` for successful queries
+- `from` — The agent_id that answered
+- `content` — The agent's response as a text string. **This is the field to extract and present to the user.**
+- `data` — Raw WebSocket message data from the agent. Usually `null` for text responses. Some agents may return structured data here (e.g. JSON objects with parsed fields), but `content` is always the reliable field to use.
 
 **Payment required (no key set):**
 ```json
@@ -430,25 +458,38 @@ Every command has a pricing model. Check `price` and `task_unit` before executin
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `price` | number | USDC amount. `0` = free. |
-| `price_type` | string | `"task-transaction"` (pay per use) or `"time-based-task"` (pay per time period) |
+| `price` | number | USDC amount per unit. `0` = free. |
+| `price_type` | string | `"task-transaction"` (pay per use) or `"time-based-task"` (subscription — pay per time period, rare) |
 | `task_unit` | string | `"per-query"` = flat fee per call. `"per-item"` = price × item count. |
 | `is_free` | boolean | `true` if price is 0 |
 | `is_billing_count` | boolean | On a parameter — if true, this parameter determines item count for per-item billing |
 
+### Price types explained
+
+- **`task-transaction`** (most common): Pay each time you call the command. This is the standard pay-per-use model. Cost depends on `task_unit` (see below).
+- **`time-based-task`** (rare): Subscription-style pricing where you pay for access over a time period (e.g. hourly, daily). The `time_unit` field on the command specifies the period. Most agents use `task-transaction`.
+
 ### Billing calculation
 
-- **per-query**: `cost = price` (flat per call, regardless of parameters)
-- **per-item**: `cost = price × count` (count comes from the parameter where `is_billing_count` is true)
+- **per-query**: `total = price` (flat fee per call, regardless of parameters)
+- **per-item**: `total = price × count` (count comes from the parameter where `is_billing_count` is true)
+
+### Facilitator fee
+
+A small flat facilitator fee of **$0.0001 USDC** is added on top of every paid query. This fee goes to the Teneo Protocol facilitator, not the agent. For practical purposes it is negligible.
+
+**Total cost = agent price + $0.0001 facilitator fee**
+
+Example: A $0.001 query actually costs $0.0011 total. A free query ($0) costs $0.
 
 ### Billing examples
 
 ```
-@hotel-finder search vienna                    → price: 0              → FREE
-@gas-sniper-agent gas eth                      → price: 0.001          → $0.001 USDC
-@x-agent-enterprise-v2 user elonmusk           → price: 0.001, per-query → $0.001 USDC
-@x-agent-enterprise-v2 timeline elonmusk 50    → price: 0.001, per-item, count=50 → $0.05 USDC
-@amazon product B08N5WRWNW                     → price: 0.0025, per-query → $0.0025 USDC
+@hotel-finder search vienna                    → price: 0              → FREE (no fee)
+@gas-sniper-agent gas eth                      → price: 0.001          → $0.0011 USDC total
+@x-agent-enterprise-v2 user elonmusk           → price: 0.001, per-query → $0.0011 USDC total
+@x-agent-enterprise-v2 timeline elonmusk 50    → price: 0.001, per-item, count=50 → $0.0501 USDC total
+@amazon product B08N5WRWNW                     → price: 0.0025, per-query → $0.0026 USDC total
 ```
 
 ---
@@ -476,6 +517,69 @@ Payments are automatic when `PRIVATE_KEY` is set and the wallet has USDC.
 | Avalanche | 43114 | eip155:43114 | USDC |
 
 The agent's quote specifies which network to use. Your wallet needs USDC on that specific chain.
+
+### Checking your USDC balance
+
+clawq does not have a built-in balance command. Use `cast` (from foundry) or `curl` to check your USDC balance on each chain:
+
+```bash
+# peaq (chain 3338) — USDC contract: 0xbbA60da06c2c5424f03f7434542280FCAd453d10
+cast balance --erc20 0xbbA60da06c2c5424f03f7434542280FCAd453d10 <your-wallet-address> --rpc-url https://peaq.api.onfinality.io/public
+
+# Base (chain 8453) — USDC contract: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+cast balance --erc20 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 <your-wallet-address> --rpc-url https://mainnet.base.org
+
+# Avalanche (chain 43114) — USDC contract: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
+cast balance --erc20 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E <your-wallet-address> --rpc-url https://api.avax.network/ext/bc/C/rpc
+```
+
+If you don't have `cast`, you can derive your wallet address from your private key and check balances on a block explorer (peaq explorer, BaseScan, SnowTrace).
+
+To get USDC: bridge USDC from any major chain to peaq, Base, or Avalanche using a bridge like Wormhole or the chain's native bridge.
+
+---
+
+## Rooms
+
+Rooms are how the Teneo backend organizes communication between users and agents. Understanding rooms helps you troubleshoot connection errors.
+
+- When you authenticate with a private key, the backend assigns you a **private room** — a dedicated channel between you and the agents.
+- Agents that are **public** and **online** are automatically available in your room.
+- When you send a query, it goes to your private room, and the target agent picks it up from there.
+- **Ephemeral wallets** (no private key set) may not get a room assigned, which is why `query` requires a persistent key.
+
+### Common room errors
+
+- **"No room available"** — The backend didn't assign you a private room. This happens with ephemeral wallets. Fix: use a persistent `PRIVATE_KEY`.
+- **"agent X does not have access to room Y"** — The agent isn't connected to your room. This can happen if the agent is offline, banned, or not public. Fix: check `clawq agents --online` to verify the agent is available. If the agent is online but still gives this error, visit https://agent-console.ai to manage your rooms.
+
+### Agent Console
+
+The **Agent Console** at https://agent-console.ai is a web dashboard where you can:
+- View all agents and their status
+- See which agents are in your room
+- Manage room assignments
+- Monitor your query history
+
+You don't need the Agent Console for normal usage — clawq handles everything via CLI. The console is useful for troubleshooting room issues or browsing agents visually.
+
+---
+
+## Rate Limits
+
+The Teneo backend enforces rate limits to prevent abuse. The exact thresholds are not publicly documented and may vary, but in practice:
+
+- **WebSocket queries**: Sending too many queries in quick succession (e.g. more than ~10 queries within a few seconds) may trigger a `rate_limit_notification`.
+- **REST API**: The `/api/public/agents` endpoint supports pagination (`limit` + `offset`). Avoid fetching all pages in a tight loop.
+
+### When rate limited
+
+The CLI receives a `rate_limit_notification` WebSocket message. In JSON mode:
+```json
+{"type":"rate_limit","message":"Too many requests. Please slow down."}
+```
+
+**What to do:** Wait 30-60 seconds, then retry. If you're making many queries programmatically, add a small delay (1-2 seconds) between each query.
 
 ---
 
@@ -564,24 +668,24 @@ clawq --private-key abc123... query --json "@amazon search wireless headphones"
 ## Error Handling
 
 ### `No room available`
-**Cause:** Auth response didn't contain a private room. Ephemeral wallets often get this.
-**Fix:** Use a persistent `PRIVATE_KEY`. Visit https://agent-console.ai to ensure your wallet has a room.
+**Cause:** Auth response didn't contain a private room. Ephemeral wallets often get this. See the **Rooms** section above for details.
+**Fix:** Use a persistent `PRIVATE_KEY`.
 
 ### `agent X does not have access to room Y`
-**Cause:** The agent isn't assigned to your private room on the backend.
-**Fix:** Use a persistent `PRIVATE_KEY`. Ensure the agent is public and online. Some agents may need to be added to your room via Agent Console.
+**Cause:** The agent isn't connected to your room. See the **Rooms** section above.
+**Fix:** Use a persistent `PRIVATE_KEY`. Check `clawq agents --online` to verify the agent is available. If still failing, visit https://agent-console.ai to manage room assignments.
 
 ### `Payment signing failed`
-**Cause:** Network config fetch failed, or the quote data was malformed.
-**Fix:** Check your internet connection. Retry. If persistent, the agent may have a configuration issue.
+**Cause:** Network config fetch failed, wallet has insufficient USDC, or the quote data was malformed.
+**Fix:** Check your USDC balance on the required chain (see **Checking your USDC balance** above). Check your internet connection. Retry. If persistent, the agent may have a configuration issue.
 
 ### `Timed out after 60s`
 **Cause:** Agent is online but didn't respond in time.
-**Fix:** Retry. If it keeps timing out, try a different agent for the same task.
+**Fix:** Retry once. If it keeps timing out, the agent may be overloaded — try a different agent for the same task.
 
-### `Rate limited`
-**Cause:** Too many requests in a short time.
-**Fix:** Wait 30-60 seconds, then retry.
+### `Rate limited` / `rate_limit_notification`
+**Cause:** Too many requests in a short time. See the **Rate Limits** section above.
+**Fix:** Wait 30-60 seconds, then retry. Add delays between programmatic queries.
 
 ### `PAYMENT REQUIRED — set PRIVATE_KEY to auto-pay`
 **Cause:** Using an ephemeral wallet against a paid agent. The CLI cannot auto-sign payments without a real key.
@@ -598,9 +702,11 @@ clawq --private-key abc123... query --json "@amazon search wireless headphones"
 
 The `.env` file in the current working directory is auto-loaded. Format:
 ```
-PRIVATE_KEY=abc123def456...
+PRIVATE_KEY=4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a2e
 BACKEND_URL=https://custom-backend.example.com
 ```
+
+The key is 64 hex characters (32 bytes). No `0x` prefix. Generate one with `openssl rand -hex 32`.
 
 ---
 
